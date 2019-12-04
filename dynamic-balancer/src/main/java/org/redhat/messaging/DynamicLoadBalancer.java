@@ -1,9 +1,6 @@
 package org.redhat.messaging;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
@@ -11,14 +8,14 @@ import org.springframework.jms.annotation.EnableJms;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
 import org.springframework.jms.config.JmsListenerContainerFactory;
-import org.springframework.jms.connection.CachingConnectionFactory;
-import org.springframework.jms.core.JmsTemplate;
 
 import javax.jms.ConnectionFactory;
+import java.util.Random;
 
 @EnableJms
 @SpringBootApplication
-public class LoadBalancer {
+public class DynamicLoadBalancer {
+
 
    @Bean
    public JmsListenerContainerFactory<?> myFactory(@Qualifier("server1ConnectionFactory") ConnectionFactory connectionFactory,
@@ -44,29 +41,24 @@ public class LoadBalancer {
    @Qualifier("jmsReceiver1Template")
    @JmsListener(destination = "example", containerFactory = "myFactory")
    public void receiveMessage1(String text) {
-      System.out.println(String.format("Received from 1 '%s'", text));
+      executeJob(text, 1);
    }
 
    @Qualifier("jmsReceiver2Template")
    @JmsListener(destination = "example", containerFactory = "myFactory2")
    public void receiveMessage2(String text) {
-      System.out.println(String.format("Received from 2 '%s'", text));
+      executeJob(text, 2);
    }
 
-  /* @Bean
-   public JmsTemplate orderJmsTemplate() {
-      JmsTemplate jmsTemplate =
-            new JmsTemplate(ccf());
-     // jmsTemplate.setDefaultDestination("example");
-      jmsTemplate.setReceiveTimeout(5000);
-
-      return jmsTemplate;
+   public void executeJob(String text, int broker) {
+      System.out.println(String.format("Received from '%s' '%s'", broker, text));
+      Random random = new Random();
+      try {
+         Thread.sleep(random.nextInt(5000) + 5000);
+      } catch (InterruptedException e) {
+         e.printStackTrace();
+      }
+      System.out.println("LoadBalancer.executeJob");
    }
 
-   @Bean()
-   public CachingConnectionFactory ccf() {
-      CachingConnectionFactory ccf = new CachingConnectionFactory();
-      //ccf.setAddresses("localhost:5672,localhost:5772");
-      return ccf;
-   }*/
 }
