@@ -14,16 +14,8 @@ import org.springframework.jms.core.JmsTemplate;
 public class Sender implements CommandLineRunner {
 
    @Autowired
-   @Qualifier("jmsSender1Template")
-   private JmsTemplate jmsTemplate1;
-
-   @Autowired
-   @Qualifier("jmsSender2Template")
-   private JmsTemplate jmsTemplate2;
-
-   @Autowired
-   @Qualifier("jmsSender3Template")
-   private JmsTemplate jmsTemplate3;
+   @Qualifier("jmsSenderTemplate")
+   private JmsTemplate jmsTemplate;
 
    public static void main(String[] args) {
       SpringApplication.run(Sender.class, args);
@@ -31,17 +23,13 @@ public class Sender implements CommandLineRunner {
 
    @Override
    public void run(String... strings) throws Exception {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 30; i++) {
          sendMessage("message: " + i);
       }
    }
 
    public void sendMessage(String text) {
       System.out.println(String.format("Sending to broker 1 '%s'", text));
-      this.jmsTemplate1.convertAndSend("example", "broker1" + text);
-      System.out.println(String.format("Sending to broker 2 '%s'", text));
-      this.jmsTemplate2.convertAndSend("example", "broker2" + text);
-      System.out.println(String.format("Sending to broker 3'%s'", text));
-      this.jmsTemplate3.convertAndSend("example", "broker3" + text);
+      this.jmsTemplate.convertAndSend("example", "broker1" + text);
    }
 }

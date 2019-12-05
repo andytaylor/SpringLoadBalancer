@@ -49,25 +49,9 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
 
    @Bean
    @Primary
-   public JmsTemplate jmsSend1Template() {
+   public JmsTemplate jmsSendTemplate() {
       JmsTemplate jmsTemplate = new JmsTemplate();
       jmsTemplate.setConnectionFactory(dynamicServer1ConnectionFactory());
-      jmsTemplate.setDefaultDestinationName("example");
-      return jmsTemplate;
-   }
-
-   @Bean
-   public JmsTemplate jmsSend2Template() {
-      JmsTemplate jmsTemplate = new JmsTemplate();
-      jmsTemplate.setConnectionFactory(dynamicServer2ConnectionFactory());
-      jmsTemplate.setDefaultDestinationName("example");
-      return jmsTemplate;
-   }
-
-   @Bean
-   public JmsTemplate jmsSend3Template() {
-      JmsTemplate jmsTemplate = new JmsTemplate();
-      jmsTemplate.setConnectionFactory(dynamicServer3ConnectionFactory());
       jmsTemplate.setDefaultDestinationName("example");
       return jmsTemplate;
    }
@@ -79,6 +63,7 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
          SimpleJmsListenerEndpoint endpoint = new SimpleJmsListenerEndpoint();
          endpoint.setId("BrokerEndpoint" + id++);
          endpoint.setDestination("example");
+         endpoint.setConcurrency("5");
          endpoint.setMessageListener(dynamicLoadBalancer);
          jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrl));
       }

@@ -34,27 +34,9 @@ public class BrokerConfiguration implements ErrorHandler {
 
    @Bean
    @Primary
-   public JmsTemplate jmsSender1Template() {
+   public JmsTemplate jmsSenderTemplate() {
       JmsTemplate jmsTemplate = new JmsTemplate();
       jmsTemplate.setConnectionFactory(server1ConnectionFactory());
-      jmsTemplate.setDefaultDestinationName("example");
-      return jmsTemplate;
-   }
-
-   @Bean
-   @Primary
-   public JmsTemplate jmsSender2Template() {
-      JmsTemplate jmsTemplate = new JmsTemplate();
-      jmsTemplate.setConnectionFactory(server2ConnectionFactory());
-      jmsTemplate.setDefaultDestinationName("example");
-      return jmsTemplate;
-   }
-
-   @Bean
-   @Primary
-   public JmsTemplate jmsSender3Template() {
-      JmsTemplate jmsTemplate = new JmsTemplate();
-      jmsTemplate.setConnectionFactory(server3ConnectionFactory());
       jmsTemplate.setDefaultDestinationName("example");
       return jmsTemplate;
    }
