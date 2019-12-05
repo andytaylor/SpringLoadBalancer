@@ -27,6 +27,9 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
    @Value("#{'${brokerUrls}'.trim().split(';')}")
    private List<String> brokerUrls;
 
+   @Value("${clientConcurrency}")
+   private String clientConcurrency;
+
    @Bean
    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
       return new PropertySourcesPlaceholderConfigurer();
@@ -63,7 +66,7 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
          SimpleJmsListenerEndpoint endpoint = new SimpleJmsListenerEndpoint();
          endpoint.setId("BrokerEndpoint" + id++);
          endpoint.setDestination("example");
-         endpoint.setConcurrency("5");
+         endpoint.setConcurrency(clientConcurrency);
          endpoint.setMessageListener(dynamicLoadBalancer);
          jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrl));
       }
