@@ -68,7 +68,7 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
                e.printStackTrace();
             }
          });
-         jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrls.get(0)));
+         jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrls.get(i)));
       }
    }
 
