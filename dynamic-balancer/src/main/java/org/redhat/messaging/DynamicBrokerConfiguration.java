@@ -1,5 +1,8 @@
 package org.redhat.messaging;
 
+import javax.jms.JMSException;
+import javax.jms.TextMessage;
+
 import org.apache.qpid.jms.JmsConnectionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,12 +20,11 @@ import org.springframework.jms.listener.DefaultMessageListenerContainer;
 
 import java.util.List;
 
+import static org.redhat.messaging.DynamicLoadBalancerUtil.executeJob;
+
 @Configuration
 @PropertySource("classpath:broker.properties")
 public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
-
-   @Autowired
-   public DynamicLoadBalancer dynamicLoadBalancer;
 
    @Value("#{'${brokerUrls}'.trim().split(';')}")
    private List<String> brokerUrls;
@@ -37,17 +39,7 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
 
    @Bean
    public JmsConnectionFactory dynamicServer1ConnectionFactory() {
-      return new JmsConnectionFactory("failover:(amqp://localhost:5672,amqp://localhost:5972)?jms.prefetchPolicy.queuePrefetch=1");
-   }
-
-   @Bean
-   public JmsConnectionFactory dynamicServer2ConnectionFactory() {
-      return new JmsConnectionFactory("failover:(amqp://localhost:5772,amqp://localhost:6072)?jms.prefetchPolicy.queuePrefetch=1");
-   }
-
-   @Bean
-   public JmsConnectionFactory dynamicServer3ConnectionFactory() {
-      return new JmsConnectionFactory("failover:(amqp://localhost:5872,amqp://localhost:6172)?jms.prefetchPolicy.queuePrefetch=1");
+      return new JmsConnectionFactory(brokerUrls.get(0));
    }
 
    @Bean
@@ -61,14 +53,22 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
 
    @Override
    public void configureJmsListeners(JmsListenerEndpointRegistrar jmsListenerEndpointRegistrar) {
-      int id = 1;
-      for (String brokerUrl : brokerUrls) {
+      for (int i = 0, size = brokerUrls.size(); i < size; i++) {
          SimpleJmsListenerEndpoint endpoint = new SimpleJmsListenerEndpoint();
-         endpoint.setId("BrokerEndpoint" + id++);
+         final int brokerId = i + 1;
+         endpoint.setId("BrokerEndpoint" + brokerId);
          endpoint.setDestination("example");
          endpoint.setConcurrency(clientConcurrency);
-         endpoint.setMessageListener(dynamicLoadBalancer);
-         jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrl));
+         //the lambda can be shared by clientConcurrency different threads!
+         endpoint.setMessageListener(message -> {
+            TextMessage textMessage = (TextMessage) message;
+            try {
+               executeJob(textMessage.getText(), brokerId);
+            } catch (JMSException e) {
+               e.printStackTrace();
+            }
+         });
+         jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrls.get(0)));
       }
    }
 
@@ -80,9 +80,9 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
       return factory;
    }
 
-   class DynamicJmsListenerContainerFactory extends DefaultJmsListenerContainerFactory {
+   static final class DynamicJmsListenerContainerFactory extends DefaultJmsListenerContainerFactory {
 
-      private String brokerUrl;
+      private final String brokerUrl;
 
       public DynamicJmsListenerContainerFactory(String brokerUrl) {
          this.brokerUrl = brokerUrl;

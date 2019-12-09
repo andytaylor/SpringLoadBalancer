@@ -30,6 +30,6 @@ public class Sender  implements CommandLineRunner {
 
    public void sendMessage(String text) {
       System.out.println(String.format("Sending to broker 1 '%s'", text));
-      this.jmsTemplate.convertAndSend("example", "broker1" + text);
+      this.jmsTemplate.convertAndSend("example", "broker 1 " + text);
    }
 }
