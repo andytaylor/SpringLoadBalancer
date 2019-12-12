@@ -1,10 +1,11 @@
 package org.redhat.messaging;
 
+import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
 import javax.jms.TextMessage;
 
+import org.apache.activemq.artemis.api.jms.ActiveMQJMSClient;
 import org.apache.qpid.jms.JmsConnectionFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,13 +18,14 @@ import org.springframework.jms.config.JmsListenerEndpointRegistrar;
 import org.springframework.jms.config.SimpleJmsListenerEndpoint;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.listener.DefaultMessageListenerContainer;
+import org.springframework.util.ErrorHandler;
 
 import java.util.List;
 
 import static org.redhat.messaging.DynamicLoadBalancerUtil.executeJob;
 
 @Configuration
-@PropertySource("classpath:broker.properties")
+@PropertySource("classpath:${client.config:qpid.properties}")
 public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
 
    @Value("#{'${brokerUrls}'.trim().split(';')}")
@@ -32,14 +34,20 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
    @Value("${clientConcurrency}")
    private String clientConcurrency;
 
+   @Value("${client}")
+   private String client;
+
+   @Value("${connections}")
+   private int connections;
+
    @Bean
    public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
       return new PropertySourcesPlaceholderConfigurer();
    }
 
    @Bean
-   public JmsConnectionFactory dynamicServer1ConnectionFactory() {
-      return new JmsConnectionFactory(brokerUrls.get(0));
+   public ConnectionFactory dynamicServer1ConnectionFactory() {
+      return createConnectionFactory(brokerUrls.get(0), "sender");
    }
 
    @Bean
@@ -54,21 +62,27 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
    @Override
    public void configureJmsListeners(JmsListenerEndpointRegistrar jmsListenerEndpointRegistrar) {
       for (int i = 0, size = brokerUrls.size(); i < size; i++) {
-         SimpleJmsListenerEndpoint endpoint = new SimpleJmsListenerEndpoint();
-         final int brokerId = i + 1;
-         endpoint.setId("BrokerEndpoint" + brokerId);
-         endpoint.setDestination("example");
-         endpoint.setConcurrency(clientConcurrency);
-         //the lambda can be shared by clientConcurrency different threads!
-         endpoint.setMessageListener(message -> {
-            TextMessage textMessage = (TextMessage) message;
-            try {
-               executeJob(textMessage.getText(), brokerId);
-            } catch (JMSException e) {
-               e.printStackTrace();
-            }
-         });
-         jmsListenerEndpointRegistrar.registerEndpoint(endpoint, new DynamicJmsListenerContainerFactory(brokerUrls.get(i)));
+         final String brokerId = "" + (i + 1);
+         ConnectionFactory connectionFactory = createConnectionFactory(brokerUrls.get(i), brokerId);
+         for (int j = 0; j < connections; j++) {
+            SimpleJmsListenerEndpoint endpoint = new SimpleJmsListenerEndpoint();
+            endpoint.setId("BrokerEndpoint" + brokerId + "(" + j + ")");
+            endpoint.setDestination("example");
+            endpoint.setConcurrency(clientConcurrency);
+            //the lambda can be shared by clientConcurrency different threads!
+            endpoint.setMessageListener(message -> {
+               TextMessage textMessage = (TextMessage) message;
+               try {
+                  executeJob(textMessage.getText(), brokerId);
+               } catch (JMSException e) {
+                  e.printStackTrace();
+               }
+            });
+
+            DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+            factory.setConnectionFactory(connectionFactory);
+            jmsListenerEndpointRegistrar.registerEndpoint(endpoint, factory);
+         }
       }
    }
 
@@ -80,18 +94,24 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
       return factory;
    }
 
-   static final class DynamicJmsListenerContainerFactory extends DefaultJmsListenerContainerFactory {
-
-      private final String brokerUrl;
-
-      public DynamicJmsListenerContainerFactory(String brokerUrl) {
-         this.brokerUrl = brokerUrl;
+   ConnectionFactory createConnectionFactory(String brokerUrl, String id) {
+      if ("qpid".equals(client)) {
+         return new JmsConnectionFactory(brokerUrl);
+      } else {
+         try {
+            return ActiveMQJMSClient.createConnectionFactory(brokerUrl, id);
+         } catch (Exception e) {
+            throw new RuntimeException(e);
+         }
       }
+   }
 
-      @Override
-      protected void initializeContainer(DefaultMessageListenerContainer container) {
-         setConnectionFactory(new JmsConnectionFactory(brokerUrl));
-         super.initializeContainer(container);
+  /* static final class DynamicJmsListenerContainerFactory extends DefaultJmsListenerContainerFactory {
+
+      private ConnectionFactory connectionFactory;
+
+      public DynamicJmsListenerContainerFactory(ConnectionFactory connectionFactory) {
+         this.connectionFactory = connectionFactory;
       }
 
       @Override
@@ -99,5 +119,6 @@ public class DynamicBrokerConfiguration implements JmsListenerConfigurer {
          setConnectionFactory(new JmsConnectionFactory(brokerUrl));
          return super.createContainerInstance();
       }
-   }
+   }*/
+
 }
